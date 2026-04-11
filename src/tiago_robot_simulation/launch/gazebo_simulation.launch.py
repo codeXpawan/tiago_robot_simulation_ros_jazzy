@@ -53,13 +53,13 @@ def generate_launch_description():
     )
 
     # ── Gazebo ────────────────────────────────────────────────────────────────
-    world_path = os.path.join(package_dir,'worlds','main.world')
+    world_path = os.path.join(package_dir,'worlds','test.sdf')
     ros_gz_sim = get_package_share_directory('ros_gz_sim')
     gz_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             os.path.join(ros_gz_sim, 'launch', 'gz_sim.launch.py')),
         launch_arguments={
-            'gz_args': '-r -v4 empty.sdf'
+            'gz_args': f'-r -v4 {world_path}'
         }.items()
     )
 
@@ -71,6 +71,7 @@ def generate_launch_description():
             '-name', 'tiago',
             '-allow_renaming', 'true',
             '-file', tmp_urdf,          # <-- file path, no Command() needed
+            '-x', '2', '-y', '1', '-z', '0.0',  # Adjusted Z for correct ground contact
         ],
         output='screen'
     )
