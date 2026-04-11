@@ -1,0 +1,24 @@
+[submodule "src/launch_pal"]
+	path = src/launch_pal
+	url = https://github.com/pal-robotics/launch_pal.git
+[submodule "src/pal_hey5"]
+	path = src/pal_hey5
+	url = https://github.com/pal-robotics/pal_hey5.git
+[submodule "src/play_motion2"]
+	path = src/play_motion2
+	url = https://github.com/pal-robotics/play_motion2.git
+[submodule "src/tiago_robot"]
+	path = src/tiago_robot
+	url = https://github.com/pal-robotics/tiago_robot.git
+[submodule "src/twist_mux"]
+	path = src/twist_mux
+	url = https://github.com/ros-teleop/twist_mux.git
+[submodule "src/pal_gripper"]
+	path = src/pal_gripper
+	url = https://github.com/pal-robotics/pal_gripper.git
+[submodule "src/pal_urdf_utils"]
+	path = src/pal_urdf_utils
+	url = https://github.com/pal-robotics/pal_urdf_utils.git
+[submodule "src/pmb2_robot"]
+	path = src/pmb2_robot
+	url = https://github.com/pal-robotics/pmb2_robot.git

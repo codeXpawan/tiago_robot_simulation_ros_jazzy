@@ -1,0 +1,154 @@
+controller_manager:
+  ros__parameters:
+    update_rate: 100
+
+    joint_state_broadcaster:
+      type: joint_state_broadcaster/JointStateBroadcaster
+
+    diffdrive_controller:
+      type: diff_drive_controller/DiffDriveController
+
+    torso_controller:
+      type: joint_trajectory_controller/JointTrajectoryController
+
+    arm_controller:
+      type: joint_trajectory_controller/JointTrajectoryController
+
+    head_controller:
+      type: joint_trajectory_controller/JointTrajectoryController
+
+# =============================================================================
+# Diff Drive
+# =============================================================================
+diffdrive_controller:
+  ros__parameters:
+    type: diff_drive_controller/DiffDriveController
+    use_stamped_vel: True
+    left_wheel_names  : ['wheel_left_joint']
+    right_wheel_names : ['wheel_right_joint']
+
+    # In ROS1 these physical properties were parsed from the URDF
+    wheel_radius: 0.0985
+    wheel_separation: 0.4044
+
+    wheel_separation_multiplier: 1.0
+    left_wheel_radius_multiplier: 1.0
+    right_wheel_radius_multiplier: 1.0
+    
+    publish_rate: 50.0
+    pose_covariance_diagonal : [0.001, 0.001, 0.001, 0.001, 0.001, 0.01]
+    twist_covariance_diagonal: [0.001, 0.001, 0.001, 0.001, 0.001, 0.01]
+
+    # Velocity commands timeout [s]
+    cmd_vel_timeout: 0.5
+
+    open_loop: false
+    # Base frame_id
+    odom_frame_id: odom
+    base_frame_id: base_footprint
+
+    # odom tf will be published by direct laser odometry
+    enable_odom_tf: true
+
+    # Publish limited velocity
+    publish_limited_velocity: true
+
+    # Velocity and acceleration limits
+    # Whenever a min_* is unspecified, default to -max_*
+    linear:
+      x:
+        has_velocity_limits    : true
+        max_velocity           :  1.0 # m/s
+        min_velocity           : -0.2 # m/s
+        has_acceleration_limits: true
+        max_acceleration       :  0.5 # m/s^2
+    angular:
+      z:
+        has_velocity_limits    : true
+        max_velocity           : 1.05 # 60.0º
+        has_acceleration_limits: true
+        max_acceleration       : 1.05 # 60.0º
+
+# =============================================================================
+# Torso — JointTrajectoryController only supports position/velocity/acceleration
+# NOTE: 'effort' is NOT a valid state_interface for JointTrajectoryController
+# =============================================================================
+torso_controller:
+  ros__parameters:
+    type: joint_trajectory_controller/JointTrajectoryController
+    joints:
+      - torso_lift_joint
+    command_interfaces:
+      - position
+    state_interfaces:
+      - position
+
+    open_loop_control: true
+
+    constraints:
+      goal_time: 0.6
+      stopped_velocity_tolerance: 5.0 # FIXME: See #8429
+      torso_lift_joint:
+        goal: 0.02
+
+# =============================================================================
+# Arm
+# =============================================================================
+arm_controller:
+  ros__parameters:
+    type: joint_trajectory_controller/JointTrajectoryController
+    joints:
+      - arm_1_joint
+      - arm_2_joint
+      - arm_3_joint
+      - arm_4_joint
+      - arm_5_joint
+      - arm_6_joint
+      - arm_7_joint
+    command_interfaces:
+      - position
+    state_interfaces:
+      - position
+
+    open_loop_control: true
+
+    constraints:
+      goal_time: 0.6
+      stopped_velocity_tolerance: 5.0
+      arm_1_joint:
+        goal: 0.02
+      arm_2_joint:
+        goal: 0.02
+      arm_3_joint:
+        goal: 0.02
+      arm_4_joint:
+        goal: 0.02
+      arm_5_joint:
+        goal: 0.02
+      arm_6_joint:
+        goal: 0.02
+      arm_7_joint:
+        goal: 0.02
+
+
+# =============================================================================
+# Head
+# =============================================================================
+head_controller:
+  ros__parameters:
+    type: joint_trajectory_controller/JointTrajectoryController
+    joints:
+      - head_1_joint
+      - head_2_joint
+    command_interfaces:
+      - position
+    state_interfaces:
+      - position
+    open_loop_control: true
+    constraints:
+      goal_time: 2.0
+      stopped_velocity_tolerance: 5.0
+      head_1_joint:
+        goal: 0.5
+      head_2_joint:
+        goal: 0.5
