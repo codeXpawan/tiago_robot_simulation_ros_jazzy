@@ -1,0 +1,40 @@
+arm:
+  # KDL chain endpoints — must match your URDF link names exactly
+  base_link: "torso_lift_link"
+  tip_link:  "arm_tool_link"
+
+  # Joint names in order (arm_1 = shoulder pan, arm_7 = wrist roll)
+  joint_names:
+    - arm_1_joint
+    - arm_2_joint
+    - arm_3_joint
+    - arm_4_joint
+    - arm_5_joint
+    - arm_6_joint
+    - arm_7_joint
+
+  # Joint limits [lower, upper] in radians (from TIAGo URDF)
+  joint_limits:
+    arm_1_joint: [-1.178,  1.571]
+    arm_2_joint: [-1.518,  0.524]
+    arm_3_joint: [-3.534,  1.571]
+    arm_4_joint: [-0.393,  2.618]
+    arm_5_joint: [-2.094,  2.094]
+    arm_6_joint: [-1.396,  1.396]
+    arm_7_joint: [-2.094,  2.094]
+
+  ik_solver:
+    max_iterations: 1000
+    epsilon: 1.0e-5       # convergence tolerance (m / rad)
+    timeout_sec: 2.0
+
+  # Workspace bounding box in torso_lift_link frame (fast pre-check)
+  # x: forward, y: lateral, z: vertical
+  workspace:
+    x_min: -0.10
+    x_max:  0.85
+    y_min: -0.70
+    y_max:  0.70
+    z_min: -0.50
+    z_max:  0.90
+    max_reach: 0.90    # max arm extension from shoulder (m)
