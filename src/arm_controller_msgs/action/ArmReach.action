@@ -1,0 +1,16 @@
+# Goal
+geometry_msgs/PoseStamped target_pose   # Target end-effector pose (any frame)
+bool dry_run                             # If true: check reachability/IK but do NOT move the arm
+float32 timeout_sec                      # IK solver timeout (seconds, 0 = use default)
+---
+# Result
+bool success                             # True if arm moved (or dry_run IK solved)
+bool is_reachable                        # True if target passed reachability pre-check
+string message                           # Human-readable status / error detail
+float64 ik_solve_time_ms                 # Time taken by IK solver (ms)
+float64[] joint_angles                   # Solved joint angles (radians)
+string[] joint_names                     # Corresponding joint names
+---
+# Feedback
+float32 progress                         # 0.0 → 1.0
+string status                            # Current pipeline stage description
