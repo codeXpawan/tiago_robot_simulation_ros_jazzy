@@ -1,6 +1,7 @@
 controller_manager:
   ros__parameters:
     update_rate: 100
+    use_sim_time: true
 
     joint_state_broadcaster:
       type: joint_state_broadcaster/JointStateBroadcaster
@@ -22,8 +23,9 @@ controller_manager:
 # =============================================================================
 diffdrive_controller:
   ros__parameters:
+    use_sim_time: true
     type: diff_drive_controller/DiffDriveController
-    use_stamped_vel: True
+    use_stamped_vel: false
     left_wheel_names  : ['wheel_left_joint']
     right_wheel_names : ['wheel_right_joint']
 
@@ -48,7 +50,7 @@ diffdrive_controller:
     base_frame_id: base_footprint
 
     # odom tf will be published by direct laser odometry
-    enable_odom_tf: true
+    enable_odom_tf: false
 
     # Publish limited velocity
     publish_limited_velocity: true
@@ -58,16 +60,16 @@ diffdrive_controller:
     linear:
       x:
         has_velocity_limits    : true
-        max_velocity           :  1.0 # m/s
-        min_velocity           : -0.2 # m/s
+        max_velocity           :  2.0 # m/s
+        min_velocity           : -0.4 # m/s
         has_acceleration_limits: true
-        max_acceleration       :  0.5 # m/s^2
+        max_acceleration       :  1.0 # m/s^2
     angular:
       z:
         has_velocity_limits    : true
-        max_velocity           : 1.05 # 60.0º
+        max_velocity           : 2.1 # 60.0º
         has_acceleration_limits: true
-        max_acceleration       : 1.05 # 60.0º
+        max_acceleration       : 2.1 # 60.0º
 
 # =============================================================================
 # Torso — JointTrajectoryController only supports position/velocity/acceleration

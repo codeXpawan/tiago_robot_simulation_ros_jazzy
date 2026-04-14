@@ -1,16 +1,21 @@
+import launch
+
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, RegisterEventHandler, ExecuteProcess, OpaqueFunction
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from ament_index_python.packages import get_package_share_directory
+from ament_index_python.packages import get_package_share_directory, get_packages_with_prefixes
 from launch_ros.descriptions import ParameterValue
 from launch.event_handlers import OnProcessExit
 import os
 import subprocess
 
 def generate_launch_description():
-    use_sim_time = LaunchConfiguration('use_sim_time', default='true')
+    use_rviz = LaunchConfiguration('rviz', default=True)
+    use_nav = LaunchConfiguration('nav', default=True)
+    use_slam_cartographer = LaunchConfiguration('slam_cartographer', default=True)
+    use_sim_time = LaunchConfiguration('use_sim_time', default=True)
     package_dir  = get_package_share_directory('tiago_robot_simulation')
 
     xacro_file     = os.path.join(package_dir, 'robots', 'tiago.urdf.xacro')
@@ -91,8 +96,9 @@ def generate_launch_description():
         executable='spawner',
         arguments=[
             'diffdrive_controller',
-            '--param-file',
-            robot_controllers,
+            '--param-file', robot_controllers,
+            '--controller-ros-args', 
+            '-r /diffdrive_controller/odom:=/odom',
         ],
     )
  
@@ -135,12 +141,15 @@ def generate_launch_description():
         #tf
         # '/tf@tf2_msgs/msg/TFMessage@gz.msgs.Pose_V',
         #joint states
-        '/world/empty/model/tiago/joint_state@sensor_msgs/msg/JointState@gz.msgs.Model',
+        '/world/rectangular_walls_world/model/tiago/joint_state@sensor_msgs/msg/JointState@gz.msgs.Model',
         # odometry
         # '/ground_truth_odom@nav_msgs/msg/Odometry@gz.msgs.Odometry',
     ],
     remappings=[
-        ('/world/empty/model/tiago/joint_state', '/joint_states'),
+        ('/world/rectangular_walls_world/model/tiago/joint_state', '/joint_states'),
+        ('/base_imu', '/imu'),
+        ('/scan_raw', '/scan'),
+        ('/head_front_camera/points', '/points2'),
     ],
     output='screen'
 )
@@ -153,11 +162,64 @@ def generate_launch_description():
         parameters=[{
             'robot_description': robot_description,
             'publish_frequency': 50.0,
-            'ignore_timestamp': True,
+            'use_sim_time': use_sim_time,
             'tf_prefix': 'tiago',
         }],
         output='screen'
     )
+
+    rviz_config = os.path.join(get_package_share_directory('webots_ros2_tiago'), 'resource', 'default_bringup.rviz')
+    rviz = Node(
+        package='rviz2',
+        executable='rviz2',
+        output='screen',
+        arguments=['--display-config=' + rviz_config],
+        parameters=[{'use_sim_time': use_sim_time}],
+        condition=launch.conditions.IfCondition(use_rviz)
+    )
+
+        # Navigation
+    navigation_nodes = []
+    nav2_params_file = 'nav2_params.yaml'
+    nav2_params = os.path.join(get_package_share_directory('webots_ros2_tiago'), 'resource', nav2_params_file)
+    nav2_map = os.path.join(get_package_share_directory('webots_ros2_tiago'), 'resource', 'map.yaml')
+    # if 'nav2_bringup' in get_packages_with_prefixes():
+    #     navigation_nodes.append(IncludeLaunchDescription(
+    #         PythonLaunchDescriptionSource(os.path.join(
+    #             get_package_share_directory('nav2_bringup'), 'launch', 'bringup_launch.py')),
+    #         launch_arguments=[
+    #             ('map', nav2_map),
+    #             ('params_file', nav2_params),
+    #             ('use_sim_time', use_sim_time),
+    #         ],
+    #         condition=launch.conditions.IfCondition(use_nav)))
+
+    # SLAM
+    cartographer_config_dir = os.path.join(package_dir, 'config')
+    cartographer_config_basename = 'cartographer.lua'
+    cartographer = Node(
+        package='cartographer_ros',
+        executable='cartographer_node',
+        name='cartographer_node',
+        output='screen',
+        parameters=[{'use_sim_time': use_sim_time}],
+        arguments=['-configuration_directory', cartographer_config_dir,
+                   '-configuration_basename', cartographer_config_basename],
+        # remappings=[('/scan', '/scan_raw')],
+        condition=launch.conditions.IfCondition(use_slam_cartographer))
+    navigation_nodes.append(cartographer)
+
+    grid_executable = 'cartographer_occupancy_grid_node'
+    cartographer_grid = Node(
+        package='cartographer_ros',
+        executable=grid_executable,
+        name='cartographer_occupancy_grid_node',
+        output='screen',
+        parameters=[{'use_sim_time': use_sim_time}],
+        arguments=['-resolution', '0.05'],
+        condition=launch.conditions.IfCondition(use_slam_cartographer))
+    navigation_nodes.append(cartographer_grid)
+
 
     return LaunchDescription([
         DeclareLaunchArgument('use_sim_time', default_value='true',
@@ -189,7 +251,7 @@ def generate_launch_description():
         RegisterEventHandler(
             event_handler=OnProcessExit(
                 target_action=controller_spawners[-1],  # wait for the last controller to spawn
-                on_exit=diffdrive_controller_spawner,
+                on_exit=[diffdrive_controller_spawner] + navigation_nodes,  
             )
         ),
         

@@ -229,5 +229,23 @@
     </plugin>
   </gazebo>
   </xacro:if>
+  <!-- Plugin for IMU sensor -->
+  <xacro:if value="${gazebo_version == 'gazebo'}">
+    <gazebo>
+      <plugin filename="gz-sim-imu-system"
+          name="gz::sim::systems::Imu">
+      </plugin>
+    </gazebo>
+  </xacro:if>
+  <!-- Lidar sensor plugin -->
+  <xacro:if value="${gazebo_version == 'gazebo'}">
+    <gazebo>
+      <plugin
+        filename="gz-sim-sensors-system"
+        name="gz::sim::systems::Sensors">
+        <render_engine>ogre2</render_engine>
+      </plugin>
+    </gazebo>
+  </xacro:if>
 
 </robot>

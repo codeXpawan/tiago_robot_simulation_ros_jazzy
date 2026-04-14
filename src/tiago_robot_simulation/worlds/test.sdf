@@ -66,113 +66,78 @@
       <static>true</static>
       <pose>0 0 0 0 0 0</pose>
       <link name='walls_link'>
-        <visual name='front_visual'>
+        <visual name="front_visual">
           <pose>0 -6.5 3 0 0 0</pose>
           <geometry>
-            <box>
-              <size>20 0.5 6</size>
-            </box>
+            <mesh>
+              <uri>file:////home/pika/Downloads/22-3dkedr/BentWood_Planks.obj</uri>
+              <scale>0.02 0.02 0.02</scale>
+            </mesh>
           </geometry>
-          <material>
-            <ambient>0.600000024 0.600000024 0.600000024 1</ambient>
-            <diffuse>0.699999988 0.699999988 0.699999988 1</diffuse>
-          </material>
         </visual>
-        <collision name='front_collision'>
+        <collision name="wall_collision">
           <pose>0 -6.5 3 0 0 0</pose>
           <geometry>
-            <box>
-              <size>20 0.5 6</size>
-            </box>
+            <mesh>
+              <uri>file:////home/pika/Downloads/22-3dkedr/BentWood_Planks.obj</uri>
+              <scale>0.02 0.02 0.02</scale>
+            </mesh>
           </geometry>
-          <surface>
-            <friction>
-              <ode/>
-            </friction>
-            <bounce/>
-            <contact/>
-          </surface>
         </collision>
+
         <visual name='back_visual'>
-          <pose>0 6.5 3 0 0 0</pose>
+          <pose>0 6.5 3 -3.14 0 0</pose>
           <geometry>
-            <box>
-              <size>20 0.5 6</size>
-            </box>
+            <mesh>
+              <uri>file:////home/pika/Downloads/22-3dkedr/BentWood_Planks.obj</uri>
+              <scale>0.02 0.02 0.02</scale>
+            </mesh>
           </geometry>
-          <material>
-            <ambient>0.600000024 0.600000024 0.600000024 1</ambient>
-            <diffuse>0.699999988 0.699999988 0.699999988 1</diffuse>
-          </material>
         </visual>
         <collision name='back_collision'>
-          <pose>0 6.5 3 0 0 0</pose>
-          <geometry>
-            <box>
-              <size>20 0.5 6</size>
-            </box>
+          <pose>0 6.5 3 -3.14 0 0</pose>
+         <geometry>
+            <mesh>
+              <uri>file:////home/pika/Downloads/22-3dkedr/BentWood_Planks.obj</uri>
+              <scale>0.02 0.02 0.02</scale>
+            </mesh>
           </geometry>
-          <surface>
-            <friction>
-              <ode/>
-            </friction>
-            <bounce/>
-            <contact/>
-          </surface>
         </collision>
         <visual name='left_visual'>
-          <pose>-10 0 3 0 0 0</pose>
+          <pose>-6.5 0 3 0 0 -1.57</pose>
           <geometry>
-            <box>
-              <size>0.5 12.5 6</size>
-            </box>
+            <mesh>
+              <uri>file:////home/pika/Downloads/22-3dkedr/BentWood_Planks.obj</uri>
+              <scale>0.02 0.02 0.02</scale>
+            </mesh>
           </geometry>
-          <material>
-            <ambient>0.600000024 0.600000024 0.600000024 1</ambient>
-            <diffuse>0.699999988 0.699999988 0.699999988 1</diffuse>
-          </material>
         </visual>
         <collision name='left_collision'>
-          <pose>-10 0 3 0 0 0</pose>
+          <pose>-6.5 0 3 0 0 -1.57</pose>
           <geometry>
-            <box>
-              <size>0.5 12.5 6</size>
-            </box>
+            <mesh>
+              <uri>file:////home/pika/Downloads/22-3dkedr/BentWood_Planks.obj</uri>
+              <scale>0.02 0.02 0.02</scale>
+            </mesh>
           </geometry>
-          <surface>
-            <friction>
-              <ode/>
-            </friction>
-            <bounce/>
-            <contact/>
-          </surface>
         </collision>
         <visual name='right_visual'>
-          <pose>10 0 3 0 0 0</pose>
+          <pose>6.5 0 3 0 0 1.57</pose>
           <geometry>
-            <box>
-              <size>0.5 12.5 6</size>
-            </box>
+            <mesh>
+              <uri>file:////home/pika/Downloads/22-3dkedr/BentWood_Planks.obj</uri>
+              <scale>0.02 0.02 0.02</scale>
+            </mesh>
           </geometry>
-          <material>
-            <ambient>0.600000024 0.600000024 0.600000024 1</ambient>
-            <diffuse>0.699999988 0.699999988 0.699999988 1</diffuse>
-          </material>
         </visual>
         <collision name='right_collision'>
-          <pose>10 0 3 0 0 0</pose>
+          <pose>6.5 0 3 0 0 1.57</pose>
           <geometry>
-            <box>
-              <size>0.5 12.5 6</size>
-            </box>
+            <mesh>
+              <uri>file:////home/pika/Downloads/22-3dkedr/BentWood_Planks.obj</uri>
+              <scale>0.02 0.02 0.02</scale>
+            </mesh>
           </geometry>
-          <surface>
-            <friction>
-              <ode/>
-            </friction>
-            <bounce/>
-            <contact/>
-          </surface>
         </collision>
         <pose>0 0 0 0 0 0</pose>
         <inertial>
