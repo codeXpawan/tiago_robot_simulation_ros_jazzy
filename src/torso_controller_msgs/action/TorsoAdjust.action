@@ -1,0 +1,14 @@
+# Goal
+geometry_msgs/PoseStamped target_pose   # Target the arm needs to reach (any frame)
+bool dry_run                             # If true: compute height but do NOT move torso
+float32 timeout_sec                      # Move timeout (0 = use default)
+---
+# Result
+bool success
+float64 torso_height                    # Commanded torso_lift_joint value (m)
+float64 previous_torso_height           # torso_lift_joint value before this call (m)
+string message
+---
+# Feedback
+float32 progress                        # 0.0 → 1.0
+string status                           # Current stage description

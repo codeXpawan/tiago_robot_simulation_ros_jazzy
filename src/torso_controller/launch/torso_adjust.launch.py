@@ -11,7 +11,6 @@ def generate_launch_description():
         description='Use simulation (Gazebo) clock',
     )
 
-    # Torso adjust server — pre-positions the torso before each arm IK solve
     torso_adjust_server = Node(
         package='torso_controller',
         executable='torso_adjust_server',
@@ -22,19 +21,7 @@ def generate_launch_description():
         output='screen',
     )
 
-    # Arm reach server — transforms pose, solves IK, executes trajectory
-    arm_reach_server = Node(
-        package='arm_controller',
-        executable='arm_reach_server',
-        name='arm_reach_server',
-        parameters=[
-            {'use_sim_time': LaunchConfiguration('use_sim_time')},
-        ],
-        output='screen',
-    )
-
     return LaunchDescription([
         use_sim_time_arg,
         torso_adjust_server,
-        arm_reach_server,
     ])

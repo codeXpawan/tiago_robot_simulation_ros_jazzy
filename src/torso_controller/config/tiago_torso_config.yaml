@@ -1,0 +1,26 @@
+torso:
+  # Joint controlled by this server
+  joint_name: "torso_lift_joint"
+
+  # Physical limits (metres) — from TIAGo URDF
+  lower_limit: 0.0
+  upper_limit: 0.35
+
+  # Height of torso_lift_link above base_footprint when torso_lift_joint = 0
+  # Derived from URDF:
+  #   base_link  → torso_fixed_link  : z = 0.193  (pmb2 base)
+  #   torso_fixed_link → torso_lift_link : z = 0.597  (at joint = 0)
+  # Total: 0.193 + 0.597 = 0.790 m
+  torso_base_z: 0.790
+
+  # Target z-position (in torso_lift_link frame) we aim for when computing
+  # the optimal torso height.  The arm IK workspace spans z ∈ [-0.5, 0.9];
+  # 0.1 places the target slightly below the workspace centre which suits
+  # typical forward-grasping tasks.
+  arm_workspace_target_z: 0.1
+
+  motion:
+    # Duration of the torso trajectory command (seconds)
+    trajectory_duration_sec: 3.0
+    # Extra settle time after the trajectory is sent (seconds)
+    settle_wait_sec: 3.5
