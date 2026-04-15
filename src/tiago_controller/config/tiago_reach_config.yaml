@@ -1,0 +1,30 @@
+reach_target:
+  # Distance the base stops from the target (m).
+  # The arm workspace extends ~0.85m forward, so 0.55m standoff puts
+  # the target at ~0.5m in base_footprint — well within reach.
+  default_standoff_distance: 0.40
+
+  # Offset from base_footprint origin to arm shoulder (x-axis, m).
+  # The arm is mounted on the torso which is ~0.062m behind base_link centre.
+  arm_x_offset: -0.062
+
+  navigation:
+    # NavigateToPose action name
+    action_name: "navigate_to_pose"
+    # Maximum time to wait for navigation (s)
+    timeout_sec: 120.0
+
+  torso:
+    # torso_lift_joint limits (m)
+    joint_name: "torso_lift_joint"
+    lower_limit: 0.0
+    upper_limit: 0.35
+    torso_base_z: 0.790
+    arm_workspace_target_z: 0.1
+    trajectory_duration_sec: 3.0
+    settle_wait_sec: 3.5
+
+  arm:
+    # ArmReach action name
+    action_name: "arm_reach"
+    timeout_sec: 30.0

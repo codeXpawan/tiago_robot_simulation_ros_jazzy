@@ -1,0 +1,22 @@
+# Goal
+geometry_msgs/PoseStamped target_pose    # Target pose in any frame (typically map)
+string target_frame                       # TF frame to reach (overrides target_pose if non-empty)
+bool skip_navigation                      # Skip base navigation, only torso + arm
+bool skip_torso                           # Skip torso adjustment
+bool dry_run                              # Check feasibility without moving anything
+float32 standoff_distance                 # How far the base stops from target (m, 0 = default 0.55)
+---
+# Result
+bool success
+string message
+bool navigation_succeeded
+bool torso_succeeded
+bool arm_succeeded
+float64 torso_height                     # Final torso_lift_joint value (m)
+float64[] joint_angles                   # Arm IK solution (rad)
+string[] joint_names                     # Corresponding arm joint names
+---
+# Feedback
+float32 progress                         # 0.0 → 1.0
+string status                            # Human-readable stage description
+string current_phase                     # "navigating" | "adjusting_torso" | "reaching_arm"
