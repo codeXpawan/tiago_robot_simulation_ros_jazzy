@@ -36,6 +36,7 @@ from sensor_msgs.msg import JointState
 from geometry_msgs.msg import PoseStamped
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 from builtin_interfaces.msg import Duration
+from nav_msgs.msg import OccupancyGrid
 
 import tf2_ros
 import tf2_geometry_msgs  # noqa: F401
@@ -87,6 +88,7 @@ class ReachTargetServer(Node):
 
         # ── Subscribers ──────────────────────────────────────────
         self.create_subscription(JointState, '/joint_states', self._on_joint_state, 10)
+        self.create_subscription(OccupancyGrid, '/global_costmap/costmap', self._on_map, 10)  # for determining the map width and height, which is needed for the navigation goal computation
 
         # ── Torso trajectory publisher (direct, no action server) ─
         self.torso_pub = self.create_publisher(
@@ -132,6 +134,12 @@ class ReachTargetServer(Node):
         jn = self.cfg['torso']['joint_name']
         if jn in name_to_pos:
             self.current_torso_height = name_to_pos[jn]
+    
+    def _on_map(self, msg: OccupancyGrid):
+        self.map_width = msg.info.width * msg.info.resolution  # convert from cells to meters
+        self.map_height = msg.info.height * msg.info.resolution
+        self.map_pose_x = msg.info.origin.position.x    
+        self.map_pose_y = msg.info.origin.position.y    #only x,y because the map is 2D
 
     # ── Main orchestrator (synchronous) ──────────────────────────
 
@@ -245,59 +253,77 @@ class ReachTargetServer(Node):
         map_pose = self._transform_pose(target_pose, 'map', timeout=5.0)
         if map_pose is None:
             return False, f'TF to map failed (source: {target_pose.header.frame_id})'
+        
+        while (True):
 
-        # Get current robot position in map
-        robot_x, robot_y = self._get_robot_position_in_map()
+            # Get current robot position in map
+            robot_x, robot_y = self._get_robot_position_in_map()
 
-        nav_goal_pose = compute_nav_goal(map_pose, robot_x, robot_y, standoff)
-        gp = nav_goal_pose.pose.position
-        self.logger.info(
-            f'Nav goal: ({gp.x:.2f}, {gp.y:.2f}) facing target, '
-            f'standoff={standoff:.2f}m')
 
-        if dry_run:
-            fb.status = f'[DRY RUN] Would navigate to ({gp.x:.2f}, {gp.y:.2f})'
-            fb.progress = 0.5
+            nav_goal_pose = compute_nav_goal(map_pose, robot_x, robot_y, standoff, self.map_width, self.map_height, self.map_pose_x, self.map_pose_y)
+            gp = nav_goal_pose.pose.position
+            self.logger.info(
+                f'Nav goal: ({gp.x:.2f}, {gp.y:.2f}) facing target, '
+                f'standoff={standoff:.2f}m')
+
+            if dry_run:
+                fb.status = f'[DRY RUN] Would navigate to ({gp.x:.2f}, {gp.y:.2f})'
+                fb.progress = 0.5
+                goal_handle.publish_feedback(fb)
+                return True, 'dry run'
+
+            # Wait for Nav2 server
+            if not self._nav_client.wait_for_server(timeout_sec=10.0):
+                return False, 'Nav2 server not available (timeout 10s)'
+
+            # Send goal
+            nav_goal = NavigateToPose.Goal()
+            nav_goal.pose = nav_goal_pose
+
+            fb.status = 'Navigating to target area...'
+            fb.progress = 0.15
             goal_handle.publish_feedback(fb)
-            return True, 'dry run'
 
-        # Wait for Nav2 server
-        if not self._nav_client.wait_for_server(timeout_sec=10.0):
-            return False, 'Nav2 server not available (timeout 10s)'
+            send_future = self._nav_client.send_goal_async(nav_goal)
+            if not self._poll_future(send_future, 10.0):
+                return False, 'Nav2 send_goal timeout'
 
-        # Send goal
-        nav_goal = NavigateToPose.Goal()
-        nav_goal.pose = nav_goal_pose
+            nav_gh = send_future.result()
+            if not nav_gh.accepted:
+                return False, 'Nav2 goal rejected'
 
-        fb.status = 'Navigating to target area...'
-        fb.progress = 0.15
-        goal_handle.publish_feedback(fb)
+            # Wait for navigation result
+            result_future = nav_gh.get_result_async()
+            nav_timeout = self.cfg['navigation']['timeout_sec']
+            if not self._poll_future(result_future, nav_timeout):
+                # Try to cancel
+                nav_gh.cancel_goal_async()
+                #retry again
+                fb.status = f'Navigation timeout ({nav_timeout}s). Retrying...'
+                fb.progress = 0.15
+                goal_handle.publish_feedback(fb)
+                continue
+                # return False, f'Navigation timeout ({nav_timeout}s)'
 
-        send_future = self._nav_client.send_goal_async(nav_goal)
-        if not self._poll_future(send_future, 10.0):
-            return False, 'Nav2 send_goal timeout'
-
-        nav_gh = send_future.result()
-        if not nav_gh.accepted:
-            return False, 'Nav2 goal rejected'
-
-        # Wait for navigation result
-        result_future = nav_gh.get_result_async()
-        nav_timeout = self.cfg['navigation']['timeout_sec']
-        if not self._poll_future(result_future, nav_timeout):
-            # Try to cancel
-            nav_gh.cancel_goal_async()
-            return False, f'Navigation timeout ({nav_timeout}s)'
-
-        nav_status = result_future.result().status
-        # action_msgs GoalStatus: SUCCEEDED=4
-        if nav_status == 4:
-            fb.status = 'Navigation complete.'
-            fb.progress = 0.5
-            goal_handle.publish_feedback(fb)
-            return True, 'succeeded'
-        else:
-            return False, f'Nav2 finished with status={nav_status}'
+            nav_status = result_future.result().status
+            # action_msgs GoalStatus: SUCCEEDED=4
+            if nav_status == 4:
+                fb.status = 'Navigation complete.'
+                fb.progress = 0.5
+                goal_handle.publish_feedback(fb)
+                #check if final goal reached or not
+                final_x, final_y = self._get_robot_position_in_map()
+                dist_to_goal = math.hypot(final_x - map_pose.pose.position.x, final_y - map_pose.pose.position.y)
+                if dist_to_goal < standoff: 
+                    return True, 'succeeded'
+                else:
+                    continue  # if not within standoff, recompute nav goal and try again
+            else:
+                fb.status = f'Navigation failed with status={nav_status}. Retrying...'
+                fb.progress = 0.15
+                goal_handle.publish_feedback(fb)
+                continue
+                # return False, f'Nav2 finished with status={nav_status}'
 
     # ── Phase 2: Torso ───────────────────────────────────────────
 

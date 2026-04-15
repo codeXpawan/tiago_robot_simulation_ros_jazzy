@@ -2,7 +2,7 @@ reach_target:
   # Distance the base stops from the target (m).
   # The arm workspace extends ~0.85m forward, so 0.55m standoff puts
   # the target at ~0.5m in base_footprint — well within reach.
-  default_standoff_distance: 0.40
+  default_standoff_distance: 0.1
 
   # Offset from base_footprint origin to arm shoulder (x-axis, m).
   # The arm is mounted on the torso which is ~0.062m behind base_link centre.

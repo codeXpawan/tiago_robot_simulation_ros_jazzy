@@ -21,6 +21,10 @@ def compute_nav_goal(
     robot_x: float,
     robot_y: float,
     standoff_distance: float = 0.55,
+    map_width: float = 0,
+    map_height: float = 0,
+    map_pose_x: float = 0,
+    map_pose_y: float = 0
 ) -> PoseStamped:
     """
     Compute a navigation goal in ``map`` frame.
@@ -54,8 +58,18 @@ def compute_nav_goal(
 
     # Place nav goal on the line from robot to target, standoff metres back
     if dist > standoff_distance:
+        if tx > 0:
+            standoff_distance = standoff_distance
+        else:
+            standoff_distance = -standoff_distance
         gx = tx - standoff_distance * math.cos(yaw)
+        if ty > 0:
+            standoff_distance = standoff_distance
+        else:
+            standoff_distance = -standoff_distance 
         gy = ty - standoff_distance * math.sin(yaw)
+        # Clamp the goal to the map boundaries
+        gx, gy = get_clamped_goal(None, gx, gy, map_width, map_height, map_pose_x, map_pose_y)  
     else:
         # Already within standoff — stay put, just face the target
         gx = robot_x
@@ -78,3 +92,21 @@ def yaw_to_quaternion(yaw: float) -> Quaternion:
     q.z = math.sin(yaw / 2.0)
     q.w = math.cos(yaw / 2.0)
     return q
+
+def get_clamped_goal(self, target_x, target_y, width_m, height_m, map_pose_x, map_pose_y): #to be used in reach_target_action_server.py to clamp the navigation goal to the map boundaries
+
+    # Convert meters to pixel indices (u, v)
+    u = target_x - map_pose_x
+    v = target_y - map_pose_y
+    
+    # Clamp the pixel indices to the map boundaries
+    # We use 0 to (limit - 1) because indices are zero-based
+    clamped_u = max(0, min(u, width_m - 0.01))
+    clamped_v = max(0, min(v, height_m - 0.01))
+
+    # Convert back to meters (Map Frame coordinates)
+    # Adding 0.5 * res places the point in the center of the pixel
+    final_x = map_pose_x + (clamped_u)
+    final_y = map_pose_y + (clamped_v)
+
+    return final_x, final_y
