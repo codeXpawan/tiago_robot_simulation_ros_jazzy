@@ -76,7 +76,7 @@ def generate_launch_description():
             '-name', 'tiago',
             '-allow_renaming', 'true',
             '-file', tmp_urdf,          # <-- file path, no Command() needed
-            '-x', '2', '-y', '1', '-z', '0.0',  # Adjusted Z for correct ground contact
+            '-x', '4', '-y', '4', '-z', '0.0',  # Adjusted Z for correct ground contact and x, y for room corner initial position
         ],
         output='screen'
     )

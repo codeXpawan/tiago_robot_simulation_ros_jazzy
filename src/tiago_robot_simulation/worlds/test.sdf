@@ -165,7 +165,7 @@
           <geometry>
             <mesh>
               <uri>file:////home/pika/Downloads/1v2exin3byds-Tabel/Tabel/table.obj</uri>
-              <scale>0.01 0.01 0.01</scale>
+              <scale>0.009 0.009 0.009</scale>
             </mesh>
           </geometry>
         </visual>
@@ -173,7 +173,7 @@
           <geometry>
             <mesh>
               <uri>file:////home/pika/Downloads/1v2exin3byds-Tabel/Tabel/table.obj</uri>
-              <scale>0.01 0.01 0.01</scale>
+              <scale>0.009 0.009 0.009</scale>
             </mesh>
           </geometry>
         </collision>
