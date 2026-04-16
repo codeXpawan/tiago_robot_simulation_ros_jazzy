@@ -11,6 +11,7 @@
 
   <exec_depend>rclpy</exec_depend>
   <exec_depend>arm_controller_msgs</exec_depend>
+  <exec_depend>collision_detector_msgs</exec_depend>
   <exec_depend>torso_controller_msgs</exec_depend>
   <exec_depend>torso_controller</exec_depend>
   <exec_depend>geometry_msgs</exec_depend>

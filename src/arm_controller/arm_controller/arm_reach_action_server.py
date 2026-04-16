@@ -47,6 +47,12 @@ try:
 except ImportError:
     TORSO_ACTION_AVAILABLE = False
 
+try:
+    from collision_detector_msgs.srv import CheckCollision
+    COLLISION_SRV_AVAILABLE = True
+except ImportError:
+    COLLISION_SRV_AVAILABLE = False
+
 
 class ArmReachServer(Node):
 
@@ -79,6 +85,15 @@ class ArmReachServer(Node):
             self.logger.info('TorsoAdjust client ready.')
         else:
             self._torso_client = None
+
+        # Collision detector client (optional)
+        if COLLISION_SRV_AVAILABLE:
+            self._collision_client = self.create_client(
+                CheckCollision, '/check_collision',
+                callback_group=ReentrantCallbackGroup())
+            self.logger.info('CheckCollision client ready.')
+        else:
+            self._collision_client = None
 
         # Action server
         if ACTION_AVAILABLE:
@@ -177,6 +192,16 @@ class ArmReachServer(Node):
             goal_handle.succeed()
             return result
 
+        # 4.5 Collision check (if service available)
+        if not dry_run:
+            collision_ok = self._check_collision(
+                ik.joint_angles, ik.joint_names, feedback, goal_handle)
+            if not collision_ok:
+                result.success = False
+                result.message = f"Collision detected — arm motion blocked. {ik.message}"
+                goal_handle.succeed()
+                return result
+
         # 5. Execute (unless dry_run)
         if dry_run:
             result.success = True
@@ -244,6 +269,42 @@ class ArmReachServer(Node):
                 self.logger.warn(f'TorsoAdjust failed: {res.message}')
         except Exception as e:
             self.logger.warn(f'TorsoAdjust error: {e}')
+
+    # ── Collision check ────────────────────────────────────────────
+
+    def _check_collision(self, joint_angles, joint_names, feedback, goal_handle):
+        """
+        Call /check_collision service. Returns True if collision-free.
+        Silently passes if the service is unavailable.
+        """
+        if self._collision_client is None:
+            return True  # no collision detector — allow motion
+
+        if not self._collision_client.wait_for_service(timeout_sec=1.0):
+            self.logger.info('CheckCollision service not available. Skipping check.')
+            return True
+
+        feedback.status = "Checking for collisions..."
+        feedback.progress = 0.65
+        goal_handle.publish_feedback(feedback)
+
+        req = CheckCollision.Request()
+        req.joint_angles = list(joint_angles)
+        req.joint_names = list(joint_names)
+        req.safety_margin = 0.0  # use server default
+
+        future = self._collision_client.call_async(req)
+        if not self._poll_future(future, 5.0):
+            self.logger.warn('CheckCollision service timeout. Allowing motion.')
+            return True
+
+        resp = future.result()
+        if not resp.has_point_cloud:
+            self.logger.info(f'Collision check: {resp.message}. Allowing motion.')
+            return True
+
+        self.logger.info(f'Collision check: {resp.message}')
+        return resp.collision_free
 
     # ── Helpers ───────────────────────────────────────────────────
 

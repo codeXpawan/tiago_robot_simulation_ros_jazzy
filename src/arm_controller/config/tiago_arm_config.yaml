@@ -15,18 +15,18 @@ arm:
 
   # Joint limits [lower, upper] in radians (from TIAGo URDF)
   joint_limits:
-    arm_1_joint: [-1.178,  1.571]
-    arm_2_joint: [-1.518,  0.524]
-    arm_3_joint: [-3.534,  1.571]
-    arm_4_joint: [-0.393,  2.618]
+    arm_1_joint: [0,  2.7488]
+    arm_2_joint: [-1.5707,  1.09083]
+    arm_3_joint: [-3.534,  1.5707]
+    arm_4_joint: [-0.3926,  2.3561]
     arm_5_joint: [-2.094,  2.094]
-    arm_6_joint: [-1.396,  1.396]
+    arm_6_joint: [-1.4137,  1.4137]
     arm_7_joint: [-2.094,  2.094]
 
   ik_solver:
     max_iterations: 1000
     epsilon: 1.0e-5       # convergence tolerance (m / rad)
-    timeout_sec: 2.0
+    timeout_sec: 5.0
 
   # Workspace bounding box in torso_lift_link frame (fast pre-check)
   # x: forward, y: lateral, z: vertical
@@ -37,4 +37,4 @@ arm:
     y_max:  0.70
     z_min: -0.50
     z_max:  0.90
-    max_reach: 0.90    # max arm extension from shoulder (m)
+    max_reach: 0.80    # max arm extension from shoulder (m)

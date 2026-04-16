@@ -16,6 +16,7 @@ Usage:
 
 import math
 import time
+import random
 import numpy as np
 from dataclasses import dataclass, field
 from typing import Optional, List, Tuple
@@ -94,9 +95,10 @@ def treeFromUrdfModel(robot):
     except Exception as e:
         return False, None
 
+
 import rclpy
 from rclpy.node import Node
-from geometry_msgs.msg import PoseStamped, Pose
+from geometry_msgs.msg import PoseStamped, Pose, Quaternion
 from builtin_interfaces.msg import Duration
 
 
@@ -112,6 +114,8 @@ class IKResult:
     message: str = ""
     solve_time_ms: float = 0.0
     is_reachable: bool = False
+    position_error: float = float("inf")   # metres; used internally by multi-seed
+    _best_seed: List[float] = field(default_factory=list, repr=False)
 
 
 @dataclass
@@ -191,6 +195,22 @@ class TiagoIKSolver:
         IK:  ChainIkSolverVel_pinv (velocity) +
              ChainIkSolverPos_NR_JL (position, with joint limits)
     """
+
+    # ── Standard end-effector orientations (RPY) tried during multi-seed ──
+    _STANDARD_RPYS: List[Tuple[float, float, float]] = [
+        (0,             math.pi / 2,   0),           # pointing down
+        (0,             0,             0),            # identity / forward
+        (0,            -math.pi / 2,   0),            # pointing up
+        (math.pi,       0,             0),            # 180° roll
+        (0,             math.pi / 4,   0),            # 45° pitch down
+        (0,            -math.pi / 4,   0),            # −45° pitch up
+        (math.pi / 2,   0,             0),            # 90° roll
+        (-math.pi / 2,  0,             0),            # −90° roll
+        (0,             math.pi / 2,   math.pi / 2),  # down + 90° yaw
+        (0,             math.pi / 2,  -math.pi / 2),  # down − 90° yaw
+        (math.pi,       math.pi / 2,   0),            # down + 180° roll
+        (0,             math.pi,       0),            # pointing backward
+    ]
 
     def __init__(self, urdf_string: str, config: ArmConfig):
         if not KDL_AVAILABLE:
@@ -329,6 +349,7 @@ class TiagoIKSolver:
                 joint_names=self.config.joint_names,
                 message=f"IK solved. FK position error: {pos_err*1000:.2f}mm. {reason}",
                 solve_time_ms=elapsed_ms,
+                position_error=pos_err,
             )
         else:
             # KDL SolverI error codes
@@ -343,6 +364,12 @@ class TiagoIKSolver:
                 -8: "SVD failed",
             }
             err_str = err_map.get(ret, f"KDL error code {ret}")
+
+            # Compute FK position error from seed for best-result tracking
+            fk_frame = kdl.Frame()
+            self._fk_solver.JntToCart(q_out, fk_frame)
+            pos_err = (fk_frame.p - kdl_target.p).Norm()
+
             return IKResult(
                 success=False,
                 is_reachable=True,   # geometrically reachable but IK failed
@@ -350,7 +377,108 @@ class TiagoIKSolver:
                 joint_names=self.config.joint_names,
                 message=f"IK FAILED ({err_str}). Try a different seed or orientation.",
                 solve_time_ms=elapsed_ms,
+                position_error=pos_err,
             )
+
+    # ─────────────────────────────────────────────
+    # Multi-seed solver helpers
+    # ─────────────────────────────────────────────
+
+    def _cone_sample_orientations(
+        self,
+        base_orientation: Quaternion,
+        n: int = 6,
+        half_angle: float = 0.3,
+    ) -> List[Quaternion]:
+        """
+        Sample n orientations uniformly distributed around base_orientation
+        within a cone of radius half_angle (radians).
+        Helps when the exact orientation doesn't matter but nearby variants do.
+        """
+        result = []
+        q = base_orientation
+        base_rot = kdl.Rotation.Quaternion(q.x, q.y, q.z, q.w)
+        for i in range(n):
+            azimuth = 2 * math.pi * i / n
+            tilt_axis = kdl.Vector(
+                math.cos(azimuth) * math.sin(half_angle),
+                math.sin(azimuth) * math.sin(half_angle),
+                math.cos(half_angle),
+            )
+            tilt_axis.Normalize()
+            perturb = kdl.Rotation.Rot(tilt_axis, half_angle)
+            new_rot = base_rot * perturb
+            qx, qy, qz, qw = new_rot.GetQuaternion()
+            result.append(Quaternion(x=qx, y=qy, z=qz, w=qw))
+        return result
+
+    def _perturb_joints(self, joints: List[float], sigma: float = 0.05) -> List[float]:
+        """
+        Add Gaussian noise to joint angles, clamped to joint limits.
+        Small sigma (~0.05 rad) often escapes narrow local minima near the
+        current configuration without straying far from a valid region.
+        """
+        lo = self.config.joint_lower
+        hi = self.config.joint_upper
+        return [
+            float(np.clip(j + random.gauss(0, sigma), l, h))
+            for j, l, h in zip(joints, lo, hi)
+        ]
+
+    def _stratified_seeds(self, n_per_joint: int = 3) -> List[List[float]]:
+        """
+        Build a small set of seeds that evenly cover joint space via a
+        rotated Latin hypercube — n_per_joint seeds total (not n^7).
+
+        Each joint range is split into n_per_joint equal buckets; the seed
+        samples the midpoint of each bucket, rotating the bucket index per
+        joint to avoid diagonal bias.
+        """
+        lo = self.config.joint_lower
+        hi = self.config.joint_upper
+        n = self._n_joints
+        strata = []
+        for l, h in zip(lo, hi):
+            width = (h - l) / n_per_joint
+            strata.append([l + width * (k + 0.5) for k in range(n_per_joint)])
+
+        seeds = []
+        for i in range(n_per_joint):
+            seed = [strata[j][(i + j) % n_per_joint] for j in range(n)]
+            seeds.append(seed)
+        return seeds
+
+    def _jacobian_nudge_retry(
+        self,
+        target_pose: Pose,
+        best_seed: List[float],
+        orientations: List[Quaternion],
+        t_start: float,
+        n_nudges: int = 5,
+        sigma: float = 0.15,
+    ) -> Optional[IKResult]:
+        """
+        Last-chance fallback: aggressively perturb the best-failed seed and
+        retry KDL against the top orientations.  A larger sigma (0.15 rad)
+        is used here because fine perturbations have already been exhausted
+        in the main loop.  Only the first four orientations are retried to
+        keep wall-time bounded.
+        """
+        for _ in range(n_nudges):
+            nudged = self._perturb_joints(best_seed, sigma=sigma)
+            for orient in orientations[:4]:
+                trial = Pose()
+                trial.position = target_pose.position
+                trial.orientation = orient
+                result = self.solve(trial, nudged)
+                if result.success:
+                    result.solve_time_ms = (time.perf_counter() - t_start) * 1000
+                    return result
+        return None
+
+    # ─────────────────────────────────────────────
+    # Public multi-seed entry point
+    # ─────────────────────────────────────────────
 
     def solve_multi_seed(
         self,
@@ -359,70 +487,104 @@ class TiagoIKSolver:
         num_attempts: int = 30,
     ) -> IKResult:
         """
-        Solve IK by trying multiple random seeds and orientations.
+        Robust IK via multiple seeds and orientations.
+
+        Strategy (returns immediately on first success):
+          1. Orientation bank  — user-requested + 12 standard EEF poses +
+                                 6 cone-sampled variants near the request.
+          2. Seed bank         — current joints (+ small perturbations),
+                                 known-good neutral poses, uniform random,
+                                 and a stratified joint-space grid.
+          3. Jacobian-nudge    — aggressively perturbs the best-failed seed
+                                 and retries KDL as a last resort.
 
         Much more robust than a single solve() call because KDL's
         Newton-Raphson solver is very sensitive to the initial seed.
-
-        Also tries several standard end-effector orientations (pointing
-        down, forward, etc.) so callers that only care about *position*
-        don't have to guess a feasible orientation.
         """
-        import random
         t_start = time.perf_counter()
 
-        # ── fast reachability pre-check ──
+        # ── 1. Fast reachability pre-check ──────────────────────────────────
         p = target_pose.position
         reachable, reason = self.reachability.check(p.x, p.y, p.z)
         if not reachable:
             return IKResult(
-                success=False, is_reachable=False,
+                success=False,
+                is_reachable=False,
                 message=f"Pre-check FAILED: {reason}",
                 solve_time_ms=(time.perf_counter() - t_start) * 1000,
             )
 
-        # Orientations to try: the requested one + standard alternatives
-        orientations = [target_pose.orientation]  # user-requested first
-        for r, p_angle, y in [
-            (0, math.pi / 2, 0),   # pointing down
-            (0, 0, 0),              # pointing forward (identity)
-            (0, -math.pi / 2, 0),  # pointing up
-            (math.pi, 0, 0),       # rotated 180 roll
-            (0, math.pi / 4, 0),   # 45° pitch down
-        ]:
+        # ── 2. Build orientation bank ────────────────────────────────────────
+        orientations: List[Quaternion] = [target_pose.orientation]
+
+        for r, p_angle, y in self._STANDARD_RPYS:
             rot = kdl.Rotation.RPY(r, p_angle, y)
             qx, qy, qz, qw = rot.GetQuaternion()
-            from geometry_msgs.msg import Quaternion
             orientations.append(Quaternion(x=qx, y=qy, z=qz, w=qw))
 
-        seeds = []
-        # 1. current joint state
+        # 6 cone-sampled orientations clustered near the user's request
+        orientations.extend(
+            self._cone_sample_orientations(target_pose.orientation, n=6, half_angle=0.3)
+        )
+
+        # ── 3. Build seed bank ───────────────────────────────────────────────
+        seeds: List[List[float]] = []
+
         if current_joints and len(current_joints) == self._n_joints:
             seeds.append(current_joints)
-        # 2. neutral pose
-        seeds.append([0.20, -1.34, -0.20, 1.94, -1.57, 1.37, 0.0])
-        # 3. random seeds within joint limits
-        for _ in range(num_attempts):
-            seeds.append([
-                random.uniform(lo, hi)
-                for lo, hi in zip(self.config.joint_lower, self.config.joint_upper)
-            ])
+            # Small perturbations around current config often escape local minima
+            for _ in range(4):
+                seeds.append(self._perturb_joints(current_joints, sigma=0.05))
 
-        best_result = None
+        # Known-good TIAGo neutral poses
+        seeds.append([0.20, -1.34, -0.20,  1.94, -1.57,  1.37, 0.0])
+        seeds.append([0.0,  -0.785, 0.0,   1.57,  0.0,   0.785, 0.0])
+        seeds.append([0.0,   0.0,   0.0,   1.57, -1.57,  0.0,   0.0])
+
+        # Uniform random seeds within joint limits
+        lo = self.config.joint_lower
+        hi = self.config.joint_upper
+        for _ in range(num_attempts):
+            seeds.append([random.uniform(l, h) for l, h in zip(lo, hi)])
+
+        # Stratified grid seeds — evenly spaced through joint space
+        seeds.extend(self._stratified_seeds(n_per_joint=3))
+
+        # ── 4. Main solve loop ───────────────────────────────────────────────
+        best_result: Optional[IKResult] = None
+
         for orient in orientations:
             trial = Pose()
             trial.position = target_pose.position
             trial.orientation = orient
+
             for seed in seeds:
                 result = self.solve(trial, seed)
+
                 if result.success:
                     result.solve_time_ms = (time.perf_counter() - t_start) * 1000
                     return result
-                if best_result is None or result.is_reachable:
-                    best_result = result
 
-        best_result.solve_time_ms = (time.perf_counter() - t_start) * 1000
+                # Track the attempt closest to convergence for the nudge stage
+                if best_result is None or result.position_error < best_result.position_error:
+                    best_result = result
+                    best_result._best_seed = seed
+
+        # ── 5. Jacobian-nudge fallback ───────────────────────────────────────
+        if best_result is not None and best_result._best_seed:
+            nudge_result = self._jacobian_nudge_retry(
+                target_pose, best_result._best_seed, orientations, t_start
+            )
+            if nudge_result is not None and nudge_result.success:
+                return nudge_result
+
+        if best_result is not None:
+            best_result.solve_time_ms = (time.perf_counter() - t_start) * 1000
         return best_result
+
+    # ─────────────────────────────────────────────
+    # Forward kinematics
+    # ─────────────────────────────────────────────
 
     def forward_kinematics(self, joint_angles: List[float]) -> Optional[Pose]:
         """Compute FK: joint angles → end-effector pose in torso_lift_link frame."""
