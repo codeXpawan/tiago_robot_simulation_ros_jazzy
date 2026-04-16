@@ -27,6 +27,14 @@ def generate_launch_description():
         parameters=[{'use_sim_time': sim_time}],
         output='screen')
 
+    # 3D collision detector
+    # collision = Node(
+    #     package='collision_detector',
+    #     executable='collision_detector_node',
+    #     name='collision_detector',
+    #     parameters=[{'use_sim_time': sim_time}],
+    #     output='screen')
+
     # High-level reach-target orchestrator
     reach = Node(
         package='tiago_controller',
@@ -39,5 +47,6 @@ def generate_launch_description():
         use_sim_time_arg,
         torso,
         arm,
+        # collision,
         reach,
     ])

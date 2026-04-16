@@ -2,7 +2,7 @@ reach_target:
   # Distance the base stops from the target (m).
   # The arm workspace extends ~0.85m forward, so 0.55m standoff puts
   # the target at ~0.5m in base_footprint — well within reach.
-  default_standoff_distance: 0.1
+  default_standoff_distance: 0.3
 
   # Offset from base_footprint origin to arm shoulder (x-axis, m).
   # The arm is mounted on the torso which is ~0.062m behind base_link centre.
@@ -12,7 +12,7 @@ reach_target:
     # NavigateToPose action name
     action_name: "navigate_to_pose"
     # Maximum time to wait for navigation (s)
-    timeout_sec: 120.0
+    timeout_sec: 60.0
 
   torso:
     # torso_lift_joint limits (m)
@@ -23,8 +23,41 @@ reach_target:
     arm_workspace_target_z: 0.1
     trajectory_duration_sec: 3.0
     settle_wait_sec: 3.5
+    default_height: 0.15   # default torso height (m) for reach attempts
 
   arm:
     # ArmReach action name
     action_name: "arm_reach"
     timeout_sec: 30.0
+    home_joint_positions:
+#     [1776321865.228474228] [arm_reach_test]:     arm_1_joint         :   -41.2 deg
+# [INFO] [1776321865.229579700] [arm_reach_test]:     arm_2_joint         :   -87.0 deg
+# [INFO] [1776321865.230665694] [arm_reach_test]:     arm_3_joint         :   -25.3 deg
+# [INFO] [1776321865.231653580] [arm_reach_test]:     arm_4_joint         :  +137.5 deg
+# [INFO] [1776321865.232732590] [arm_reach_test]:     arm_5_joint         :   +58.5 deg
+# [INFO] [1776321865.233712631] [arm_reach_test]:     arm_6_joint         :   +49.9 deg
+# [INFO] [1776321865.234693628] [arm_reach_test]:     arm_7_joint         :  +112.9 deg
+
+      - arm_1_joint: -0.719
+      - arm_2_joint: -1.52
+      - arm_3_joint: -0.44
+      - arm_4_joint: 2.40
+      - arm_5_joint: 1.02
+      - arm_6_joint: 0.87
+      - arm_7_joint: 1.97
+
+  reposition:
+    # Maximum number of reposition attempts when arm can't reach target
+    max_attempts: 2
+    # Optimal target position in base_footprint frame (m)
+    # Center of the arm's comfortable reach envelope
+    optimal_reach_x: 0.45
+    optimal_reach_y: 0.0
+    # Minimum base displacement to justify a reposition (m)
+    min_displacement: 0.05
+    # Navigation timeout for reposition moves (s)
+    nav_timeout_sec: 45.0
+    # Max navigation retries per reposition attempt
+    max_nav_retries: 3
+    # Number of approach angles to try if primary reposition is outside map
+    num_approach_angles: 8

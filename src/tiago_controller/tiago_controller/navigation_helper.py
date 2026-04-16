@@ -58,16 +58,16 @@ def compute_nav_goal(
 
     # Place nav goal on the line from robot to target, standoff metres back
     if dist > standoff_distance:
-        if tx > 0:
-            standoff_distance = standoff_distance
-        else:
-            standoff_distance = -standoff_distance
-        gx = tx - standoff_distance * math.cos(yaw)
-        if ty > 0:
-            standoff_distance = standoff_distance
-        else:
-            standoff_distance = -standoff_distance 
-        gy = ty - standoff_distance * math.sin(yaw)
+        # if tx < 0:
+        #     standoff_distance = standoff_distance
+        # else:
+        #     standoff_distance = -standoff_distance
+        gx = tx - 0.4#- standoff_distance * math.cos(yaw)
+        # if ty > 0:
+        #     standoff_distance = standoff_distance
+        # else:
+        #     standoff_distance = -standoff_distance 
+        gy = ty #- standoff_distance * math.sin(yaw)
         # Clamp the goal to the map boundaries
         gx, gy = get_clamped_goal(None, gx, gy, map_width, map_height, map_pose_x, map_pose_y)  
     else:
@@ -93,7 +93,43 @@ def yaw_to_quaternion(yaw: float) -> Quaternion:
     q.w = math.cos(yaw / 2.0)
     return q
 
-def get_clamped_goal(self, target_x, target_y, width_m, height_m, map_pose_x, map_pose_y): #to be used in reach_target_action_server.py to clamp the navigation goal to the map boundaries
+def goal_fits_in_map(x, y, map_width, map_height, map_pose_x, map_pose_y):
+    """Check if a goal position falls within the current map boundaries."""
+    u = x - map_pose_x
+    v = y - map_pose_y
+    return 0 <= u <= map_width and 0 <= v <= map_height
+
+
+def generate_approach_candidates(
+    target_x: float,
+    target_y: float,
+    standoff: float = 0.45,
+    num_angles: int = 8,
+    map_width: float = 0,
+    map_height: float = 0,
+    map_pose_x: float = 0,
+    map_pose_y: float = 0,
+):
+    """
+    Generate candidate (x, y, yaw) positions around the target at
+    ``standoff`` distance, evenly spaced in angle.  Only candidates
+    that fall within the map boundaries are returned.
+
+    Returns:
+        List of (x, y, yaw) tuples in map frame.
+    """
+    candidates = []
+    for i in range(num_angles):
+        angle = 2.0 * math.pi * i / num_angles
+        cx = target_x - standoff * math.cos(angle)
+        cy = target_y - standoff * math.sin(angle)
+        cyaw = angle  # face toward the target
+        if goal_fits_in_map(cx, cy, map_width, map_height, map_pose_x, map_pose_y):
+            candidates.append((cx, cy, cyaw))
+    return candidates
+
+
+def get_clamped_goal(self, target_x, target_y, width_m, height_m, map_pose_x, map_pose_y):
 
     # Convert meters to pixel indices (u, v)
     u = target_x - map_pose_x

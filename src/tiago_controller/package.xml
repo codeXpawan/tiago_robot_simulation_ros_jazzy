@@ -21,6 +21,7 @@
   <exec_depend>tf2_geometry_msgs</exec_depend>
   <exec_depend>torso_controller</exec_depend>
   <exec_depend>arm_controller</exec_depend>
+  <exec_depend>collision_detector</exec_depend>
   <exec_depend>launch</exec_depend>
   <exec_depend>launch_ros</exec_depend>
 
