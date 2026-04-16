@@ -3,3 +3,4 @@ install/
 log/
 fram*
 *.png
+*__pycache__/
